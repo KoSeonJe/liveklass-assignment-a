@@ -3,16 +3,21 @@ package com.liveklass.assignment.api;
 import com.liveklass.assignment.api.dto.CourseResponse;
 import com.liveklass.assignment.api.dto.CreateCourseRequest;
 import com.liveklass.assignment.common.web.ApiResponse;
+import com.liveklass.assignment.common.web.PageResponse;
 import com.liveklass.assignment.domain.course.Course;
+import com.liveklass.assignment.service.CourseQueryService;
 import com.liveklass.assignment.service.CourseService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CourseController {
 
     private final CourseService courseService;
+    private final CourseQueryService courseQueryService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<CourseResponse>> create(
@@ -32,5 +38,18 @@ public class CourseController {
         return ResponseEntity
                 .created(URI.create("/api/courses/" + course.getId()))
                 .body(ApiResponse.of(body));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<CourseResponse>>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.of(courseQueryService.list(page, size)));
+    }
+
+    @GetMapping("/{courseId}")
+    public ResponseEntity<ApiResponse<CourseResponse>> detail(@PathVariable Long courseId) {
+        return ResponseEntity.ok(ApiResponse.of(courseQueryService.detail(courseId)));
     }
 }

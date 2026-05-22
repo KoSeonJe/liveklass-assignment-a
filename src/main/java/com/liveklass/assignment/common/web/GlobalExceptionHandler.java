@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -34,6 +35,14 @@ public class GlobalExceptionHandler {
                 .toList();
         return ResponseEntity.status(ec.status())
                 .body(ErrorResponse.of(ec.code(), "Validation failed", fields));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        ErrorCode ec = ErrorCode.INVALID_REQUEST;
+        String message = "Invalid value for parameter '" + ex.getName() + "': " + ex.getValue();
+        return ResponseEntity.status(ec.status())
+                .body(ErrorResponse.of(ec.code(), message));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
