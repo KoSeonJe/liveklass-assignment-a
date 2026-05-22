@@ -68,7 +68,30 @@ class EnrollmentE2ETest extends AbstractIntegrationTest {
   - 원자적 UPDATE (예: `tryIncreaseCurrentCount`)
   - 락 힌트(`@Lock`)
   - Querydsl 동적 쿼리
-- DB 제약(CHECK, UNIQUE) 동작 검증도 여기에 포함.
+- DB 제약(UNIQUE 등) 동작 검증도 여기에 포함. CHECK 제약은 도메인 로직(정적 팩토리 검증 + 원자적 UPDATE WHERE 절)으로 막으므로 별도 검증 불필요.
+- **테스트는 `given/when/then` 패턴으로 단순 호출**. `TransactionTemplate`·`@Transactional` 테스트 wrap 금지.
+- **DB 초기화**: `DatabaseCleaner`가 매 테스트 전 `TRUNCATE`. `@Transactional` 자동 롤백 방식 **금지** (롤백된 케이스가 실제 커밋 시점 동작과 다를 수 있음).
+
+#### `@Modifying @Query`와 `@Transactional` 패턴 (Spring Data JPA)
+
+`JpaRepository`의 자동 `@Transactional`은 `SimpleJpaRepository`에서 상속된 메서드(`save`, `findById` 등)에만 적용된다. **사용자 정의 `@Query @Modifying` 메서드는 별도 프록시 경로**(QueryExecutor)로 실행되며 클래스 레벨 `@Transactional`이 적용되지 않는다.
+
+따라서 `@Modifying @Query` 메서드는 다음 중 하나가 필요:
+- (권장) repo 메서드에 `@Transactional` 명시 — Spring Data 공식 권장 패턴
+- 호출자(Service)가 `@Transactional` 보유
+
+repo 메서드의 `@Transactional`은 Service가 호출 시 기본 propagation `REQUIRED`로 기존 tx에 join. 이중 tx 아님.
+
+```java
+public interface CourseRepository extends JpaRepository<Course, Long> {
+    @Transactional
+    @Modifying
+    @Query("UPDATE Course c SET c.currentCount = c.currentCount + 1 WHERE ...")
+    int tryIncreaseCurrentCount(@Param("courseId") Long courseId);
+}
+```
+
+→ 테스트도 단순 `courseRepository.tryIncreaseCurrentCount(id)`로 호출. tx 신경 X.
 
 **위치 예시**: `src/test/java/.../repository/`
 
@@ -113,6 +136,24 @@ class EnrollmentTest {
 5. **공통 베이스**: `AbstractIntegrationTest` 활용. Testcontainers 컨테이너 재사용 설정 권장.
 6. **동시성 테스트는 E2E 계층에서 필수** (Tech-spec §10.2).
 
+## `@DisplayName` 필수
+
+모든 테스트 메서드에 `@DisplayName("한글로 시나리오 서술")` 부착. 메서드명만으로는 "무엇을 검증하는지" 불명확하므로 한글 서술을 강제.
+
+- 형식: `<주어/대상> <조건> <기대 결과>` (예: `"OPEN 강의에 정원 미달 시 current_count가 1 증가한다"`)
+- 메서드명은 영문 snake_case 유지 (IDE 검색·grep 용이)
+- `@ParameterizedTest`도 동일 — `@DisplayName`로 케이스 이름 부여, 파라미터 변동 부분은 `name`으로 표현 가능
+
+```java
+@Test
+@DisplayName("OPEN 강의에 정원 미달 시 current_count가 1 증가한다")
+void tryIncreaseCurrentCount_increments_when_open_and_under_capacity() { ... }
+```
+
+테스트 리포트(`./gradlew test`)와 IDE 트리에 한글 표시 → 실패 시 의도 파악 즉시.
+
+---
+
 ## 금지 사항
 
 - `@MockBean`으로 Repository·Service·Facade 대체
@@ -120,3 +161,4 @@ class EnrollmentTest {
 - `MockMvc` 기반 컨트롤러 테스트 (E2E는 RestAssured)
 - Spring Data JPA 기본 메서드 테스트
 - 트랜잭션 경계를 추정만으로 작성 — 반드시 통합 테스트로 검증
+- 테스트 메서드를 `@Transactional`·`TransactionTemplate`로 감싸기 — DB 초기화는 `TRUNCATE` 기반 `DatabaseCleaner`로 통일

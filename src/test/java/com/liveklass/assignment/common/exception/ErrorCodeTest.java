@@ -2,12 +2,14 @@ package com.liveklass.assignment.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 
 class ErrorCodeTest {
 
     @Test
+    @DisplayName("각 ErrorCode가 의도한 HTTP 상태로 매핑된다")
     void status_mapping_is_correct() {
         assertThat(ErrorCode.INVALID_REQUEST.status()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(ErrorCode.MISSING_HEADER.status()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -23,6 +25,7 @@ class ErrorCodeTest {
     }
 
     @Test
+    @DisplayName("모든 ErrorCode의 code 값은 서로 중복되지 않는다")
     void codes_are_distinct() {
         long unique = java.util.Arrays.stream(ErrorCode.values())
                 .map(ErrorCode::code)
