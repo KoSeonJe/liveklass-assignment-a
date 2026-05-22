@@ -1,0 +1,29 @@
+package com.liveklass.assignment.service;
+
+import com.liveklass.assignment.api.dto.CreateCourseRequest;
+import com.liveklass.assignment.domain.course.Course;
+import com.liveklass.assignment.repository.CourseRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class CourseService {
+
+    private final CourseRepository courseRepository;
+
+    @Transactional
+    public Course create(Long creatorId, CreateCourseRequest request) {
+        Course course = Course.createDraft(
+                creatorId,
+                request.title(),
+                request.description(),
+                request.price(),
+                request.maxCapacity(),
+                request.startDate(),
+                request.endDate()
+        );
+        return courseRepository.save(course);
+    }
+}
