@@ -2,6 +2,7 @@ package com.liveklass.assignment.service;
 
 import com.liveklass.assignment.domain.course.CourseNotOpenException;
 import com.liveklass.assignment.domain.enrollment.Enrollment;
+import com.liveklass.assignment.domain.enrollment.EnrollmentNotFoundException;
 import com.liveklass.assignment.repository.CourseRepository;
 import com.liveklass.assignment.repository.EnrollmentRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,5 +25,12 @@ public class EnrollmentService {
         Enrollment enrollment = Enrollment.create(courseId, classmateId);
         enrollmentRepository.save(enrollment);
         return enrollment.getId();
+    }
+
+    @Transactional
+    public void rollbackToPending(Long enrollmentId) {
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new EnrollmentNotFoundException(enrollmentId));
+        enrollment.rollbackToPending();
     }
 }

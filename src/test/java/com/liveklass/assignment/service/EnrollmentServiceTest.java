@@ -12,6 +12,7 @@ import com.liveklass.assignment.repository.CourseRepository;
 import com.liveklass.assignment.repository.EnrollmentRepository;
 import com.liveklass.assignment.support.AbstractIntegrationTest;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,6 +92,22 @@ class EnrollmentServiceTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> enrollmentService.createEnrollment(saved.getId(), 42L))
                 .isInstanceOf(CourseNotOpenException.class);
+    }
+
+    @Test
+    @DisplayName("rollbackToPending은 CONFIRMED Enrollment를 PENDING으로 되돌린다")
+    void rollback_to_pending_reverts_status() {
+        Course course = saveOpen(7L, 10);
+        Long enrollmentId = enrollmentService.createEnrollment(course.getId(), 42L);
+        Enrollment confirmed = enrollmentRepository.findById(enrollmentId).orElseThrow();
+        confirmed.confirm(LocalDateTime.now());
+        enrollmentRepository.saveAndFlush(confirmed);
+
+        enrollmentService.rollbackToPending(enrollmentId);
+
+        Enrollment reloaded = enrollmentRepository.findById(enrollmentId).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(EnrollmentStatus.PENDING);
+        assertThat(reloaded.getConfirmedAt()).isNull();
     }
 
     private Course saveDraft(Long creatorId, int max) {

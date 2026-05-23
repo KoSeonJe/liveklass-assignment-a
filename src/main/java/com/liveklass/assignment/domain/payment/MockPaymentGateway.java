@@ -1,31 +1,21 @@
 package com.liveklass.assignment.domain.payment;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.stereotype.Component;
 
 @Component
 public class MockPaymentGateway implements PaymentGateway {
 
-    private final AtomicReference<GatewayResult> nextResult = new AtomicReference<>(defaultSuccess());
-
-    public void setNextResult(GatewayResult result) {
-        if (result == null) {
-            throw new IllegalArgumentException("GatewayResult는 null일 수 없습니다.");
-        }
-        this.nextResult.set(result);
-    }
-
-    public void reset() {
-        this.nextResult.set(defaultSuccess());
-    }
+    private static final long PROCESSING_DELAY_MS = 2_000L;
 
     @Override
-    public GatewayResult charge(Long paymentId, int amount) {
-        return nextResult.get();
-    }
-
-    private static GatewayResult defaultSuccess() {
-        return new GatewayResult.Success("mock-ext-" + UUID.randomUUID());
+    public String charge(Long paymentId, int amount) {
+        try {
+            Thread.sleep(PROCESSING_DELAY_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new PaymentGatewayException("결제 처리 중 인터럽트가 발생했습니다.");
+        }
+        return "mock-ext-" + UUID.randomUUID();
     }
 }
