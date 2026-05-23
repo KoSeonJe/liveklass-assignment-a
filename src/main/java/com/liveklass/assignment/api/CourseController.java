@@ -1,6 +1,7 @@
 package com.liveklass.assignment.api;
 
 import com.liveklass.assignment.api.dto.ChangeCourseStatusRequest;
+import com.liveklass.assignment.api.dto.CourseEnrollmentItemResponse;
 import com.liveklass.assignment.api.dto.CourseResponse;
 import com.liveklass.assignment.api.dto.CourseStatusChangeResponse;
 import com.liveklass.assignment.api.dto.CreateCourseRequest;
@@ -74,6 +75,16 @@ public class CourseController {
                     .status(HttpStatus.ACCEPTED)
                     .body(ApiResponse.of(EnrollmentResponse.waitlisted(courseId, w.position())));
         };
+    }
+
+    @GetMapping("/{courseId}/enrollments")
+    public ResponseEntity<ApiResponse<PageResponse<CourseEnrollmentItemResponse>>> listEnrollments(
+            @RequestHeader("X-User-Id") Long userId,
+            @PathVariable Long courseId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.of(enrollmentFacade.listForCourse(courseId, userId, page, size)));
     }
 
     @PatchMapping("/{courseId}/status")

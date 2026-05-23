@@ -1,5 +1,6 @@
 package com.liveklass.assignment.facade;
 
+import com.liveklass.assignment.api.dto.CourseEnrollmentItemResponse;
 import com.liveklass.assignment.api.dto.EnrollmentListItemResponse;
 import com.liveklass.assignment.common.web.PageResponse;
 import com.liveklass.assignment.domain.course.InMemoryCourseSeatCounter;
@@ -31,6 +32,11 @@ public class EnrollmentFacade {
 
     public PageResponse<EnrollmentListItemResponse> listForUser(Long userId, int page, int size) {
         return enrollmentQueryService.listForUser(userId, page, size);
+    }
+
+    public PageResponse<CourseEnrollmentItemResponse> listForCourse(
+            Long courseId, Long requesterId, int page, int size) {
+        return enrollmentQueryService.listForCourse(courseId, requesterId, page, size);
     }
 
     public EnrollmentResult enroll(Long courseId, Long classmateId) {
