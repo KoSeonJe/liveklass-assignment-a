@@ -10,9 +10,6 @@ public class InMemoryCourseSeatCounter {
     private final ConcurrentHashMap<Long, AtomicInteger> counters = new ConcurrentHashMap<>();
 
     public void initialize(Long courseId, int remaining) {
-        if (remaining < 0) {
-            throw new IllegalArgumentException("remaining must be >= 0");
-        }
         counters.put(courseId, new AtomicInteger(remaining));
     }
 
@@ -37,6 +34,10 @@ public class InMemoryCourseSeatCounter {
 
     public void remove(Long courseId) {
         counters.remove(courseId);
+    }
+
+    public void clearAll() {
+        counters.clear();
     }
 
     public int remaining(Long courseId) {

@@ -87,29 +87,29 @@ public class Course {
     public static Course createDraft(Long creatorId, String title, String description, int price,
                                      int maxCapacity, LocalDate startDate, LocalDate endDate) {
         if (creatorId == null) {
-            throw new IllegalArgumentException("creatorId must not be null");
+            throw new IllegalArgumentException("크리에이터 ID는 필수입니다.");
         }
         if (title == null || title.isBlank()) {
-            throw new IllegalArgumentException("title must not be blank");
+            throw new IllegalArgumentException("강의 제목은 비어 있을 수 없습니다.");
         }
         if (price < 0) {
-            throw new IllegalArgumentException("price must be >= 0");
+            throw new IllegalArgumentException("가격은 0 이상이어야 합니다.");
         }
         if (maxCapacity <= 0) {
-            throw new IllegalArgumentException("maxCapacity must be > 0");
+            throw new IllegalArgumentException("정원은 1 이상이어야 합니다.");
         }
         if (startDate == null || endDate == null) {
-            throw new IllegalArgumentException("startDate and endDate must not be null");
+            throw new IllegalArgumentException("강의 시작일과 종료일은 필수입니다.");
         }
         if (endDate.isBefore(startDate)) {
-            throw new IllegalArgumentException("endDate must not be before startDate");
+            throw new IllegalArgumentException("강의 종료일은 시작일보다 빠를 수 없습니다.");
         }
         return new Course(creatorId, title, description, price, maxCapacity, startDate, endDate);
     }
 
     public void verifyCreator(Long requesterId) {
-        if (requesterId == null || !this.creatorId.equals(requesterId)) {
-            throw new UnauthorizedException("Requester is not the creator of course " + this.id);
+        if (!this.creatorId.equals(requesterId)) {
+            throw new UnauthorizedException("요청자가 강의의 크리에이터가 아닙니다. courseId=" + this.id);
         }
     }
 
@@ -119,6 +119,18 @@ public class Course {
     }
 
     public int remainingCapacity() {
-        return this.maxCapacity - this.currentCount;
+        int remaining = this.maxCapacity - this.currentCount;
+        if (remaining < 0) {
+            throw new IllegalStateException(
+                    "강의 잔여 정원이 음수입니다. courseId=" + this.id + ", remaining=" + remaining);
+        }
+        return remaining;
+    }
+
+    public void validateRemainingCapacity() {
+        int remaining = this.maxCapacity - this.currentCount;
+        if (remaining <= 0) {
+            throw new IllegalStateException("강의 잔여 정원은 1명 이상이어야 합니다.");
+        }
     }
 }
