@@ -11,6 +11,7 @@ import com.liveklass.assignment.domain.enrollment.Enrollment;
 import com.liveklass.assignment.domain.enrollment.EnrollmentNotFoundException;
 import com.liveklass.assignment.domain.enrollment.EnrollmentStatus;
 import com.liveklass.assignment.domain.enrollment.IllegalEnrollmentStateTransitionException;
+import com.liveklass.assignment.dto.CancelledEnrollment;
 import com.liveklass.assignment.repository.CourseRepository;
 import com.liveklass.assignment.repository.EnrollmentRepository;
 import com.liveklass.assignment.support.AbstractIntegrationTest;
@@ -44,7 +45,7 @@ class EnrollmentCancelServiceTest extends AbstractIntegrationTest {
         Enrollment confirmed = saveConfirmedEnrollment(course.getId(), 42L, CONFIRMED_AT);
         clock.set(CONFIRMED_AT.plusDays(1));
 
-        EnrollmentService.CancelledEnrollment result = enrollmentService.cancel(confirmed.getId(), 42L);
+        CancelledEnrollment result = enrollmentService.cancel(confirmed.getId(), 42L);
 
         assertThat(result.enrollmentId()).isEqualTo(confirmed.getId());
         assertThat(result.courseId()).isEqualTo(course.getId());

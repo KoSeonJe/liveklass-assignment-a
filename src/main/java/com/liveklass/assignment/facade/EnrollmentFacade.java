@@ -4,7 +4,6 @@ import com.liveklass.assignment.api.dto.EnrollmentListItemResponse;
 import com.liveklass.assignment.common.web.PageResponse;
 import com.liveklass.assignment.domain.course.InMemoryCourseSeatCounter;
 import com.liveklass.assignment.domain.enrollment.EnrollmentResult;
-import com.liveklass.assignment.domain.payment.Payment;
 import com.liveklass.assignment.domain.payment.PaymentGateway;
 import com.liveklass.assignment.domain.waitlist.InMemoryCourseWaitlist;
 import com.liveklass.assignment.dto.CancelledEnrollment;
@@ -87,10 +86,9 @@ public class EnrollmentFacade {
     }
 
     private void cancelPaymentIfSuccess(Long enrollmentId) {
-        Payment payment = paymentService.findSuccessPayment(enrollmentId)
-                .orElseThrow(() -> new IllegalStateException(
-                        "CONFIRMED enrollment에 SUCCESS payment 없음. enrollmentId=" + enrollmentId));
-        paymentGateway.cancel(payment.getExternalPaymentKey());
-        paymentService.cancel(payment.getId());
+        paymentService.findSuccessPayment(enrollmentId).ifPresent(payment -> {
+            paymentGateway.cancel(payment.getExternalPaymentKey());
+            paymentService.cancel(payment.getId());
+        });
     }
 }
