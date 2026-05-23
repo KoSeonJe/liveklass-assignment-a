@@ -1,6 +1,7 @@
 package com.liveklass.assignment.support;
 
 import com.liveklass.assignment.domain.course.InMemoryCourseSeatCounter;
+import com.liveklass.assignment.domain.waitlist.InMemoryCourseWaitlist;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
@@ -36,11 +37,17 @@ public abstract class MySqlIntegrationSupport {
     @Autowired(required = false)
     private InMemoryCourseSeatCounter seatCounter;
 
+    @Autowired(required = false)
+    private InMemoryCourseWaitlist waitlist;
+
     @BeforeEach
     void cleanDatabase() {
         databaseCleaner.truncate();
         if (seatCounter != null) {
             seatCounter.clearAll();
+        }
+        if (waitlist != null) {
+            waitlist.clearAll();
         }
     }
 }

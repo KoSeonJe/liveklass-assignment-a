@@ -4,16 +4,20 @@ import com.liveklass.assignment.api.dto.ChangeCourseStatusRequest;
 import com.liveklass.assignment.api.dto.CourseResponse;
 import com.liveklass.assignment.api.dto.CourseStatusChangeResponse;
 import com.liveklass.assignment.api.dto.CreateCourseRequest;
+import com.liveklass.assignment.api.dto.EnrollmentResponse;
 import com.liveklass.assignment.common.web.ApiResponse;
 import com.liveklass.assignment.common.web.PageResponse;
 import com.liveklass.assignment.domain.course.Course;
+import com.liveklass.assignment.domain.enrollment.EnrollmentResult;
 import com.liveklass.assignment.facade.CourseFacade;
+import com.liveklass.assignment.facade.EnrollmentFacade;
 import com.liveklass.assignment.service.CourseQueryService;
 import com.liveklass.assignment.service.CourseService;
 import com.liveklass.assignment.service.CourseStatusChangeResult;
 import jakarta.validation.Valid;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -33,6 +37,7 @@ public class CourseController {
     private final CourseService courseService;
     private final CourseQueryService courseQueryService;
     private final CourseFacade courseFacade;
+    private final EnrollmentFacade enrollmentFacade;
 
     @PostMapping
     public ResponseEntity<ApiResponse<CourseResponse>> create(
@@ -57,6 +62,22 @@ public class CourseController {
     @GetMapping("/{courseId}")
     public ResponseEntity<ApiResponse<CourseResponse>> detail(@PathVariable Long courseId) {
         return ResponseEntity.ok(ApiResponse.of(courseQueryService.detail(courseId)));
+    }
+
+    @PostMapping("/{courseId}/enrollments")
+    public ResponseEntity<ApiResponse<EnrollmentResponse>> enroll(
+            @RequestHeader("X-User-Id") Long userId,
+            @PathVariable Long courseId
+    ) {
+        EnrollmentResult result = enrollmentFacade.enroll(courseId, userId);
+        return switch (result) {
+            case EnrollmentResult.Pending p -> ResponseEntity
+                    .created(URI.create("/api/enrollments/" + p.enrollmentId()))
+                    .body(ApiResponse.of(EnrollmentResponse.pending(p.enrollmentId())));
+            case EnrollmentResult.Waitlisted w -> ResponseEntity
+                    .status(HttpStatus.ACCEPTED)
+                    .body(ApiResponse.of(EnrollmentResponse.waitlisted(courseId, w.position())));
+        };
     }
 
     @PatchMapping("/{courseId}/status")
