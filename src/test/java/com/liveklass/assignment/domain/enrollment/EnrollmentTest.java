@@ -119,4 +119,26 @@ class EnrollmentTest {
         assertThatThrownBy(() -> e.cancelByClassmate(1L, CONFIRMED_AT))
                 .isInstanceOf(IllegalEnrollmentStateTransitionException.class);
     }
+
+    @Test
+    @DisplayName("revertCancel은 CANCELLED→CONFIRMED로 복귀시키고 cancelledAt을 null로 만든다")
+    void revertCancel_restores_confirmed() {
+        Enrollment e = confirmed(1L, CONFIRMED_AT);
+        e.cancelByClassmate(1L, CONFIRMED_AT.plusDays(1));
+        assertThat(e.getStatus()).isEqualTo(EnrollmentStatus.CANCELLED);
+
+        e.revertCancel();
+
+        assertThat(e.getStatus()).isEqualTo(EnrollmentStatus.CONFIRMED);
+        assertThat(e.getCancelledAt()).isNull();
+        assertThat(e.getConfirmedAt()).isEqualTo(CONFIRMED_AT);
+    }
+
+    @Test
+    @DisplayName("revertCancel은 CANCELLED가 아닌 상태에서 호출 시 IllegalEnrollmentStateTransitionException을 던진다")
+    void revertCancel_from_non_cancelled_throws() {
+        Enrollment e = confirmed(1L, CONFIRMED_AT);
+        assertThatThrownBy(e::revertCancel)
+                .isInstanceOf(IllegalEnrollmentStateTransitionException.class);
+    }
 }

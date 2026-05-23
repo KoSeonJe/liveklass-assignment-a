@@ -96,6 +96,12 @@ public class Enrollment {
         this.cancelledAt = now;
     }
 
+    public void revertCancel() {
+        this.status.verifyTransitionTo(EnrollmentStatus.CONFIRMED);
+        this.status = EnrollmentStatus.CONFIRMED;
+        this.cancelledAt = null;
+    }
+
     public void validateEqualsClassmateId(Long userId) {
         if (!this.classmateId.equals(userId)) {
             throw new UnauthorizedException("요청자가 수강 신청의 본인이 아닙니다. enrollmentId=" + id+", classmateId=" + userId);

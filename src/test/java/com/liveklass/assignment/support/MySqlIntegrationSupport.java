@@ -2,6 +2,7 @@ package com.liveklass.assignment.support;
 
 import com.liveklass.assignment.domain.course.InMemoryCourseSeatCounter;
 import com.liveklass.assignment.domain.waitlist.InMemoryCourseWaitlist;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
@@ -40,6 +41,9 @@ public abstract class MySqlIntegrationSupport {
     @Autowired(required = false)
     private InMemoryCourseWaitlist waitlist;
 
+    @Autowired(required = false)
+    private MutableClock mutableClock;
+
     @BeforeEach
     void cleanDatabase() {
         databaseCleaner.truncate();
@@ -48,6 +52,9 @@ public abstract class MySqlIntegrationSupport {
         }
         if (waitlist != null) {
             waitlist.clearAll();
+        }
+        if (mutableClock != null) {
+            mutableClock.set(Instant.now());
         }
     }
 }

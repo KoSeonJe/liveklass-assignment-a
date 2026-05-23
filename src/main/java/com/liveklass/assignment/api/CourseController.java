@@ -11,8 +11,6 @@ import com.liveklass.assignment.domain.course.Course;
 import com.liveklass.assignment.domain.enrollment.EnrollmentResult;
 import com.liveklass.assignment.facade.CourseFacade;
 import com.liveklass.assignment.facade.EnrollmentFacade;
-import com.liveklass.assignment.service.CourseQueryService;
-import com.liveklass.assignment.service.CourseService;
 import com.liveklass.assignment.service.CourseStatusChangeResult;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -34,8 +32,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class CourseController {
 
-    private final CourseService courseService;
-    private final CourseQueryService courseQueryService;
     private final CourseFacade courseFacade;
     private final EnrollmentFacade enrollmentFacade;
 
@@ -44,7 +40,7 @@ public class CourseController {
             @RequestHeader("X-User-Id") Long userId,
             @Valid @RequestBody CreateCourseRequest request
     ) {
-        Course course = courseService.create(userId, request);
+        Course course = courseFacade.create(userId, request);
         CourseResponse body = CourseResponse.from(course);
         return ResponseEntity
                 .created(URI.create("/api/courses/" + course.getId()))
@@ -56,12 +52,12 @@ public class CourseController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(ApiResponse.of(courseQueryService.list(page, size)));
+        return ResponseEntity.ok(ApiResponse.of(courseFacade.list(page, size)));
     }
 
     @GetMapping("/{courseId}")
     public ResponseEntity<ApiResponse<CourseResponse>> detail(@PathVariable Long courseId) {
-        return ResponseEntity.ok(ApiResponse.of(courseQueryService.detail(courseId)));
+        return ResponseEntity.ok(ApiResponse.of(courseFacade.detail(courseId)));
     }
 
     @PostMapping("/{courseId}/enrollments")

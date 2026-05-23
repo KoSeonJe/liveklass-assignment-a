@@ -18,18 +18,36 @@ public class InMemoryCourseSeatCounter {
         if (counter == null) {
             throw new CourseNotOpenException(courseId);
         }
-        if (counter.decrementAndGet() < 0) {
-            counter.incrementAndGet();
-            return false;
-        }
+        int prev;
+        do {
+            prev = counter.get();
+            if (prev <= 0) {
+                return false;
+            }
+        } while (!counter.compareAndSet(prev, prev - 1));
         return true;
+    }
+
+    public void acquire(Long courseId) {
+        AtomicInteger counter = counters.get(courseId);
+        if (counter == null) {
+            throw new CourseNotOpenException(courseId);
+        }
+        int prev;
+        do {
+            prev = counter.get();
+            if (prev <= 0) {
+                throw new IllegalArgumentException("정원이 0명 이하입니다.");
+            }
+        } while (!counter.compareAndSet(prev, prev - 1));
     }
 
     public void release(Long courseId) {
         AtomicInteger counter = counters.get(courseId);
-        if (counter != null) {
-            counter.incrementAndGet();
+        if (counter == null) {
+            throw new IllegalArgumentException("해당 courseId로 정원을 조회할 수 없습니다.");
         }
+        counter.incrementAndGet();
     }
 
     public void remove(Long courseId) {

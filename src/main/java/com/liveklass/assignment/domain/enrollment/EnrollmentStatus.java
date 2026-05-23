@@ -11,7 +11,7 @@ public enum EnrollmentStatus {
     private static final Map<EnrollmentStatus, Set<EnrollmentStatus>> ALLOWED = Map.of(
             PENDING, Set.of(CONFIRMED),
             CONFIRMED, Set.of(PENDING, CANCELLED),
-            CANCELLED, Set.of()
+            CANCELLED, Set.of(CONFIRMED)
     );
 
     public void verifyTransitionTo(EnrollmentStatus next) {

@@ -23,20 +23,45 @@ public class PaymentFacade {
     public PaymentResponse pay(Long enrollmentId, Long userId, String idempotencyKey) {
         PaymentPreparedInfo prepared = enrollPaymentService.confirmAndPreparePayment(enrollmentId, userId, idempotencyKey);
 
+        String externalPaymentKey;
         try {
-            String externalPaymentKey = paymentGateway.charge(prepared.paymentId(), prepared.amount());
-            paymentService.markSuccess(prepared.paymentId(), externalPaymentKey);
+            externalPaymentKey = paymentGateway.charge(prepared.paymentId(), prepared.amount());
         } catch (PaymentGatewayException e) {
             paymentService.markFailed(prepared.paymentId());
             enrollmentService.rollbackToPending(enrollmentId);
             throw new PaymentFailedException(e.reason());
+        }
+
+        try {
+            paymentService.markSuccess(prepared.paymentId(), externalPaymentKey);
         } catch (RuntimeException e) {
-            //결제 취소 markCancel
-            //결제 취소 api 호출
-            enrollmentService.rollbackToPending(enrollmentId);
+            bestEffortCancelGateway(externalPaymentKey);
+            bestEffortMarkFailed(prepared.paymentId());
+            bestEffortRollbackEnrollment(enrollmentId);
             throw e;
         }
 
         return PaymentResponse.success(prepared.paymentId());
+    }
+
+    private void bestEffortCancelGateway(String externalPaymentKey) {
+        try {
+            paymentGateway.cancel(externalPaymentKey);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private void bestEffortMarkFailed(Long paymentId) {
+        try {
+            paymentService.markFailed(paymentId);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private void bestEffortRollbackEnrollment(Long enrollmentId) {
+        try {
+            enrollmentService.rollbackToPending(enrollmentId);
+        } catch (RuntimeException ignored) {
+        }
     }
 }

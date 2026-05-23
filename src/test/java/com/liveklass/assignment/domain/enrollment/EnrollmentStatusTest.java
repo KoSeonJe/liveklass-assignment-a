@@ -12,7 +12,8 @@ class EnrollmentStatusTest {
     @CsvSource({
             "PENDING, CONFIRMED",
             "CONFIRMED, PENDING",
-            "CONFIRMED, CANCELLED"
+            "CONFIRMED, CANCELLED",
+            "CANCELLED, CONFIRMED"
     })
     void allowed_transitions(EnrollmentStatus from, EnrollmentStatus to) {
         assertThatCode(() -> from.verifyTransitionTo(to)).doesNotThrowAnyException();
@@ -24,7 +25,6 @@ class EnrollmentStatusTest {
             "PENDING, CANCELLED",
             "CONFIRMED, CONFIRMED",
             "CANCELLED, PENDING",
-            "CANCELLED, CONFIRMED",
             "CANCELLED, CANCELLED"
     })
     void disallowed_transitions(EnrollmentStatus from, EnrollmentStatus to) {

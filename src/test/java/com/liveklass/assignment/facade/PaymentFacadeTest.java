@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.doThrow;
 
 import com.liveklass.assignment.api.dto.PaymentResponse;
 import com.liveklass.assignment.common.auth.UnauthorizedException;
@@ -21,12 +24,14 @@ import com.liveklass.assignment.domain.payment.PaymentStatus;
 import com.liveklass.assignment.repository.CourseRepository;
 import com.liveklass.assignment.repository.EnrollmentRepository;
 import com.liveklass.assignment.repository.PaymentRepository;
+import com.liveklass.assignment.service.PaymentService;
 import com.liveklass.assignment.support.AbstractIntegrationTest;
 import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 
 class PaymentFacadeTest extends AbstractIntegrationTest {
 
@@ -35,6 +40,9 @@ class PaymentFacadeTest extends AbstractIntegrationTest {
 
     @MockBean
     PaymentGateway paymentGateway;
+
+    @SpyBean
+    PaymentService paymentService;
 
     @Autowired
     CourseRepository courseRepository;
@@ -134,6 +142,28 @@ class PaymentFacadeTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> paymentFacade.pay(enrollment.getId(), 99L, "key-1"))
                 .isInstanceOf(UnauthorizedException.class);
+    }
+
+    @Test
+    @DisplayName("markSuccess가 실패하면 게이트웨이 cancel·Payment FAILED·Enrollment PENDING 보정이 모두 수행되고 예외가 전파된다")
+    void mark_success_failure_runs_best_effort_compensations() {
+        Course course = saveOpenCourse(1L, 10, 10000);
+        Enrollment enrollment = savePendingEnrollment(course.getId(), 42L);
+        given(paymentGateway.charge(anyLong(), anyInt())).willReturn("ext-success");
+        doThrow(new RuntimeException("forced markSuccess failure"))
+                .when(paymentService).markSuccess(anyLong(), anyString());
+
+        assertThatThrownBy(() -> paymentFacade.pay(enrollment.getId(), 42L, "key-broken"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("forced");
+
+        then(paymentGateway).should().cancel("ext-success");
+        Enrollment reloaded = enrollmentRepository.findById(enrollment.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(EnrollmentStatus.PENDING);
+        Payment payment = paymentRepository.findAll().stream()
+                .filter(p -> p.getEnrollmentId().equals(enrollment.getId()))
+                .findFirst().orElseThrow();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
     }
 
     private Course saveOpenCourse(Long creatorId, int max, int price) {
