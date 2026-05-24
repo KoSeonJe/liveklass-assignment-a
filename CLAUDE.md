@@ -6,7 +6,7 @@ LiveKlass BE 과제 A — 수강 신청 시스템. Claude Code가 작업할 때 
 
 ## 문서 우선순위
 
-1. `docs/assingment.md` — 원본 과제 요구사항 (변경 금지, 출처 보존)
+1. `docs/assingment.md` — 원본 과제 요구사항 (로컬 보관 전용, 추적 제외)
 2. `docs/PRD.md` — 요구사항 해석·범위·상태 머신·유스케이스
 3. `docs/Tech-spec.md` — 아키텍처·동시성 설계·코드 스케치·테이블 정의
 

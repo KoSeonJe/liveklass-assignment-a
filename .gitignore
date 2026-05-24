@@ -43,3 +43,6 @@ bin/
 .env
 *.log
 /data/
+
+# Original assignment spec (개인 보관)
+/docs/assingment.md
