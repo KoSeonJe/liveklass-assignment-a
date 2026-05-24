@@ -12,6 +12,7 @@ import com.liveklass.assignment.domain.course.IllegalCourseStateTransitionExcept
 import com.liveklass.assignment.repository.CourseRepository;
 import com.liveklass.assignment.support.AbstractIntegrationTest;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -122,9 +123,58 @@ class CourseServiceTest extends AbstractIntegrationTest {
                 .isInstanceOf(CourseNotFoundException.class);
     }
 
+    @Test
+    @DisplayName("autoOpenDueDrafts는 startDate 도래한 DRAFT만 OPEN으로 전환하고 결과 리스트를 반환한다")
+    void autoOpenDueDrafts_transitions_only_due_drafts() {
+        Course dueDraft = saveDraftWithStart(7L, 30, LocalDate.of(2026, 5, 24));
+        Course pastDraft = saveDraftWithStart(7L, 10, LocalDate.of(2026, 5, 1));
+        Course futureDraft = saveDraftWithStart(7L, 30, LocalDate.of(2026, 6, 1));
+        Course alreadyOpen = saveOpen(7L, 30);
+        Course closed = Course.createDraft(7L, "t", "d", 0, 30,
+                LocalDate.of(2026, 5, 24), LocalDate.of(2026, 7, 1));
+        closed.transitionTo(CourseStatus.CLOSED);
+        Course savedClosed = courseRepository.save(closed);
+
+        List<CourseStatusChangeResult> results =
+                courseService.autoOpenDueDrafts(LocalDate.of(2026, 5, 24));
+
+        assertThat(results).hasSize(2);
+        assertThat(results).extracting(CourseStatusChangeResult::courseId)
+                .containsExactlyInAnyOrder(dueDraft.getId(), pastDraft.getId());
+        assertThat(results).allMatch(r -> r.status() == CourseStatus.OPEN);
+
+        assertThat(courseRepository.findById(dueDraft.getId()).orElseThrow().getStatus())
+                .isEqualTo(CourseStatus.OPEN);
+        assertThat(courseRepository.findById(pastDraft.getId()).orElseThrow().getStatus())
+                .isEqualTo(CourseStatus.OPEN);
+        assertThat(courseRepository.findById(futureDraft.getId()).orElseThrow().getStatus())
+                .isEqualTo(CourseStatus.DRAFT);
+        assertThat(courseRepository.findById(alreadyOpen.getId()).orElseThrow().getStatus())
+                .isEqualTo(CourseStatus.OPEN);
+        assertThat(courseRepository.findById(savedClosed.getId()).orElseThrow().getStatus())
+                .isEqualTo(CourseStatus.CLOSED);
+    }
+
+    @Test
+    @DisplayName("autoOpenDueDrafts는 대상이 없을 때 빈 리스트를 반환한다")
+    void autoOpenDueDrafts_returns_empty_when_no_targets() {
+        saveDraftWithStart(7L, 30, LocalDate.of(2026, 6, 1));
+
+        List<CourseStatusChangeResult> results =
+                courseService.autoOpenDueDrafts(LocalDate.of(2026, 5, 24));
+
+        assertThat(results).isEmpty();
+    }
+
     private Course saveDraft(Long creatorId, int max) {
         Course course = Course.createDraft(creatorId, "t", "d", 0, max,
                 LocalDate.of(2026, 6, 1), LocalDate.of(2026, 7, 1));
+        return courseRepository.save(course);
+    }
+
+    private Course saveDraftWithStart(Long creatorId, int max, LocalDate startDate) {
+        Course course = Course.createDraft(creatorId, "t", "d", 0, max,
+                startDate, startDate.plusMonths(1));
         return courseRepository.save(course);
     }
 

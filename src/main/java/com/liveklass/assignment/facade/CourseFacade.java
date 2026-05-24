@@ -9,6 +9,8 @@ import com.liveklass.assignment.domain.course.InMemoryCourseSeatCounter;
 import com.liveklass.assignment.service.CourseQueryService;
 import com.liveklass.assignment.service.CourseService;
 import com.liveklass.assignment.service.CourseStatusChangeResult;
+import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -37,9 +39,15 @@ public class CourseFacade {
         switch (result.status()) {
             case OPEN -> seatCounter.initialize(result.courseId(), result.remaining());
             case CLOSED -> seatCounter.remove(result.courseId());
-            case DRAFT -> {
-            }
         }
         return result;
+    }
+
+    public List<CourseStatusChangeResult> autoOpenDueDrafts(LocalDate today) {
+        List<CourseStatusChangeResult> results = courseService.autoOpenDueDrafts(today);
+        for (CourseStatusChangeResult result : results) {
+            seatCounter.initialize(result.courseId(), result.remaining());
+        }
+        return results;
     }
 }

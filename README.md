@@ -66,7 +66,7 @@ docker compose up -d        # MySQL 기동
 |---|---|---|---|
 | 1 | 정원 카운팅 기준 | `PENDING`과 `CONFIRMED` 모두 정원을 점유 | 결제 전 신청도 자리 확보로 간주해야 정원 보장이 명확해짐 |
 | 2 | 취소 가능 기간 기준일 | `CONFIRMED` 전이 시점(결제 완료)부터 7일 이내 | "결제 후 7일"이라는 요구사항을 충실히 반영 |
-| 3 | 강의 상태 전이 트리거 | 모든 전이는 크리에이터의 명시적 요청에 의해서만 발생 (자동 전이 없음) | 자동 전이는 별도 스케줄러·정책이 필요하여 평가 핵심에서 벗어남 |
+| 3 | 강의 상태 전이 트리거 | 크리에이터의 명시적 요청 + 시스템 자동 전이(`DRAFT → OPEN`, `startDate` 도래 시 매일 00:00 KST). 그 외 자동 전이(`CLOSED → OPEN` 재개, `OPEN → CLOSED` 자동 마감 등)는 없음 | 강의 시작일에 크리에이터가 수동으로 OPEN 전환하는 것은 비현실적이므로 해당 트리거만 자동화. 단일 인스턴스 가정 하 분산 락 미적용 |
 | 4 | 인증·인가 | `X-User-Id` 헤더 기반 식별. 역할(Role) 필드는 두지 않고, 강의의 `creator_id`로 권한 검증 | 요구사항에서 인증/인가 간략화를 명시적으로 허용 |
 | 5 | 페이지네이션 | offset/limit (기본 size 20, 최대 100) | 가장 보편적인 방식. 커서 기반은 과제 범위 대비 과함 |
 | 6 | 결제 흐름 순서 | 애플리케이션 내부 상태 전이 → 외부 결제 API 호출 순 | 외부 결제 성공 후 내부 실패 시의 결제 취소 비용 회피 |
@@ -257,7 +257,25 @@ Enum의 `verifyTransitionTo()` + 도메인 메서드 두 곳에서 전이 강제
 - 결제 실패 시 보상은 짧은 트랜잭션 두 번으로 끊어 처리. 결제 상태를 실패로 바꾸고, 수강 신청을 다시 결제 전 상태로 되돌림.
 - 결제는 성공했는데 그 직후 DB 갱신이 깨지는 드문 경우엔 결제사에 취소 요청을 한 번 보내고, 내부 상태도 결제 전으로 되돌려 돈만 빠지고 끝나는 일을 막음.
 
-### 5-4. 페이지네이션 — Offset/Limit 채택
+### 5-4. 자동 OPEN 스케줄러
+
+**트리거**: 매일 00:00 KST(`Asia/Seoul`), Spring `@Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")`.
+
+**대상**: `status = DRAFT` AND `startDate <= today` 인 강의 전체.
+
+**처리 경로** (`CourseAutoOpenScheduler` → `CourseFacade.autoOpenDueDrafts` → `CourseService.autoOpenDueDrafts`):
+
+1. Service: `@Transactional` 안에서 대상 fetch → `Course.transitionTo(OPEN)` 일괄 적용 → `List<CourseStatusChangeResult>` 반환.
+2. Facade: 트랜잭션 밖에서 결과별 `seatCounter.initialize(courseId, remaining)` 호출. 기존 수동 `changeStatus`의 OPEN 분기와 동일 경로 재사용.
+3. `currentCount = 0`이 자명하므로 `validateRemainingCapacity()` 생략. requesterId 검증 없음(시스템 트리거).
+
+**Clock 추상화**: `java.time.Clock` 빈을 주입받아 `LocalDate.now(clock.withZone(KST))`로 오늘 산출. 테스트는 `MutableClock`(@Primary)로 시점 고정.
+
+**부분 실패**: per-course 처리 분기 없음. 한 강의 전이가 실패하면 전체 batch 롤백. 단일 인스턴스 가정 하 다음 tick에서 자연 재시도.
+
+**운영 가정**: 단일 인스턴스. 분산 락(ShedLock 등) 미적용. 다중 인스턴스 시 중복 실행 방지 필요.
+
+### 5-5. 페이지네이션 — Offset/Limit 채택
 
 | 항목 | Offset | Cursor |
 |---|:---:|:---:|
@@ -477,6 +495,7 @@ course (1) ──< enrollment (1) ──< payment
 - **인메모리 대기열 재기동 시 손실** — `SeatCounterRestorer`는 카운터만 복원.
 - **Flyway 미적용** — Hibernate `ddl-auto` 사용 (로컬 `update`, 테스트 `create-drop`).
 - **단일 인스턴스 가정** — 멀티 인스턴스 시 인메모리 카운터/대기열 분산 동기화 필요 (Redis 등).
+- **자동 OPEN 스케줄러 분산 락 미적용** — 단일 인스턴스 전제. 다중 인스턴스 배포 시 ShedLock 등으로 중복 실행 방지 필요. `CLOSED → OPEN` 자동 전이는 여전히 범위 외(§4 표 #3 참고).
 - **결제 게이트웨이 Mock 성공률 시뮬레이션** — `MockPaymentGateway` (~97% 성공률).
 
 ## 10. 테스트 실행

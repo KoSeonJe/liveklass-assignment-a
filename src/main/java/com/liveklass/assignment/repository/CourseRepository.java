@@ -2,6 +2,7 @@ package com.liveklass.assignment.repository;
 
 import com.liveklass.assignment.domain.course.Course;
 import com.liveklass.assignment.domain.course.CourseStatus;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +17,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     Page<Course> findAllByOrderByIdDesc(Pageable pageable);
 
     List<Course> findAllByStatus(CourseStatus status);
+
+    List<Course> findAllByStatusAndStartDateLessThanEqual(CourseStatus status, LocalDate date);
 
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -5,6 +5,9 @@ import com.liveklass.assignment.domain.course.Course;
 import com.liveklass.assignment.domain.course.CourseNotFoundException;
 import com.liveklass.assignment.domain.course.CourseStatus;
 import com.liveklass.assignment.repository.CourseRepository;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,5 +44,21 @@ public class CourseService {
                 course.getStatus(),
                 course.remainingCapacity()
         );
+    }
+
+    @Transactional
+    public List<CourseStatusChangeResult> autoOpenDueDrafts(LocalDate today) {
+        List<Course> targets = courseRepository.findAllByStatusAndStartDateLessThanEqual(
+                CourseStatus.DRAFT, today);
+        List<CourseStatusChangeResult> results = new ArrayList<>(targets.size());
+        for (Course course : targets) {
+            course.transitionTo(CourseStatus.OPEN);
+            results.add(new CourseStatusChangeResult(
+                    course.getId(),
+                    course.getStatus(),
+                    course.remainingCapacity()
+            ));
+        }
+        return results;
     }
 }
