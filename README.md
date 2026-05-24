@@ -240,42 +240,61 @@ Enum의 `verifyTransitionTo()` + 도메인 메서드 두 곳에서 전이 강제
         ▼                         ▼
      실패                       성공
         │                         │
-   ┌────┴─────────────┐      ┌────┴──────────────┐
-   │ 보상 tx#2a       │      │ tx#3              │
-   │ Payment → FAILED │      │ Payment → SUCCESS │
-   ├──────────────────┤      └────┬──────────────┘
-   │ 보상 tx#2b       │           │
-   │ Enrollment       │           ▼
-   │   CONFIRMED      │      200 OK
-   │   → PENDING      │
-   └────┬─────────────┘
+   ┌────┴─────────────────┐  ┌────┴──────────────┐
+   │ 보상 tx#2 (단일 TX)  │  │ tx#3              │
+   │ Payment → FAILED     │  │ Payment → SUCCESS │
+   │ Enrollment           │  └────┬──────────────┘
+   │   CONFIRMED          │       │
+   │   → PENDING          │       ▼
+   └────┬─────────────────┘  200 OK
         ▼
    402 PaymentFailed
 ```
 
+**취소 흐름 — 내부 상태 전이 → 외부 환불 → 실패 시 보상 → 대기열 승급**
+
+```
+취소 요청
+   │
+   ▼
+┌─ tx#1 (Service @Transactional) ────────────┐
+│  Enrollment  CONFIRMED → CANCELLED          │
+│  Course      current_count - 1              │
+└────────────────────┬────────────────────────┘
+                     ▼
+        SUCCESS Payment 조회  ← TX 외부
+                     │
+        ┌────────────┴────────────┐
+        ▼                         ▼
+       존재                      없음 (skip)
+        │                         │
+        ▼                         │
+   외부 Gateway cancel()           │
+        │                         │
+        ▼                         │
+   tx#2 Payment → CANCELLED       │
+        │                         │
+        ├────── 위 두 단계 실패 ──┐│
+        │                       ││
+        ▼                       ▼▼
+  ┌─────────────────────┐  seatCounter.release   ← TX 외부
+  │ 보상 tx#3           │  waitlist 승급 (tx#4 옵셔널)
+  │ Enrollment          │       │
+  │   CANCELLED         │       ▼
+  │   → CONFIRMED       │  200 OK
+  │ Course count + 1    │
+  └────┬────────────────┘
+       ▼
+  5xx (취소 실패, 보상도 실패 시 CRITICAL 로그)
+```
+
 - 외부 결제 호출은 항상 트랜잭션 바깥에서 실행. DB 락이 결제사 응답을 기다리며 묶여 있지 않음.
 - 결제 실패 시 보상은 단일 트랜잭션으로 묶어 처리. 결제 상태를 실패로 바꾸는 것과 수강 신청을 결제 전 상태로 되돌리는 것이 함께 성공하거나 함께 롤백되어 두 도메인이 어긋나지 않음. 보상 트랜잭션 자체가 실패하면 CRITICAL 로그로 표면화 후 운영자 수동 보정.
-- 결제는 성공했는데 직후 DB 갱신이 깨지는 드문 경우엔 PG에 취소 요청을 최선 시도(best-effort)하고 내부 상태를 보상 트랜잭션으로 결제 전 상태로 되돌림. PG 취소 응답 자체가 실패하면 CRITICAL 로그로 표면화 — 결제 게이트웨이 응답 검증·재시도·DLQ는 본 과제 범위 외이며 운영 모니터링/대사로 보강하는 영역.
+- 결제는 성공했는데 직후 DB 갱신이 깨지는 드문 경우엔 결제사에 취소 요청을 최선 시도(best-effort)하고 내부 상태를 보상 트랜잭션으로 결제 전 상태로 되돌림. 결제사 취소 응답 자체가 실패하면 CRITICAL 로그로 표면화 — 결제 게이트웨이 응답 검증·재시도·DLQ는 본 과제 범위 외이며 운영 모니터링/대사로 보강하는 영역.
+- 취소 흐름도 동일 원칙. 수강 신청 상태와 강의 정원 차감을 짧은 트랜잭션으로 먼저 확정한 뒤, 외부 환불 호출은 트랜잭션 바깥에서 실행. 외부 환불 또는 결제 취소 상태 전이가 실패하면 수강 신청을 다시 확정 상태로 되돌리고 정원도 원복하는 보상 트랜잭션이 실행됨. 보상마저 실패하면 CRITICAL 로그.
+- 내부 상태 확정이 끝난 뒤에야 인메모리 정원 카운터를 해제하고 대기열 최선두를 승급. 대기열 승급은 인메모리 처리와 새 신청 생성 트랜잭션으로 끊어 처리해 본 취소 응답 경로를 지연시키지 않음.
 
-### 5-4. 자동 OPEN 스케줄러
-
-**트리거**: 매일 00:00 KST(`Asia/Seoul`), Spring `@Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")`.
-
-**대상**: `status = DRAFT` AND `startDate <= today` 인 강의 전체.
-
-**처리 경로** (`CourseAutoOpenScheduler` → `CourseFacade.autoOpenDueDrafts` → `CourseService.autoOpenDueDrafts`):
-
-1. Service: `@Transactional` 안에서 대상 fetch → `Course.transitionTo(OPEN)` 일괄 적용 → `List<CourseStatusChangeResult>` 반환.
-2. Facade: 트랜잭션 밖에서 결과별 `seatCounter.initialize(courseId, remaining)` 호출. 기존 수동 `changeStatus`의 OPEN 분기와 동일 경로 재사용.
-3. `currentCount = 0`이 자명하므로 `validateRemainingCapacity()` 생략. requesterId 검증 없음(시스템 트리거).
-
-**Clock 추상화**: `java.time.Clock` 빈을 주입받아 `LocalDate.now(clock.withZone(KST))`로 오늘 산출. 테스트는 `MutableClock`(@Primary)로 시점 고정.
-
-**부분 실패**: per-course 처리 분기 없음. 한 강의 전이가 실패하면 전체 batch 롤백. 단일 인스턴스 가정 하 다음 tick에서 자연 재시도.
-
-**운영 가정**: 단일 인스턴스. 분산 락(ShedLock 등) 미적용. 다중 인스턴스 시 중복 실행 방지 필요.
-
-### 5-5. 페이지네이션 — Offset/Limit 채택
+### 5-4. 페이지네이션 — Offset/Limit 채택
 
 | 항목 | Offset | Cursor |
 |---|:---:|:---:|

@@ -2,6 +2,7 @@ package com.liveklass.assignment.boot;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.liveklass.assignment.common.boot.SeatCounterRestorer;
 import com.liveklass.assignment.domain.course.Course;
 import com.liveklass.assignment.domain.course.CourseStatus;
 import com.liveklass.assignment.domain.course.InMemoryCourseSeatCounter;

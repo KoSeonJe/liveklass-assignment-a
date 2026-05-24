@@ -1,4 +1,4 @@
-package com.liveklass.assignment.boot;
+package com.liveklass.assignment.common.boot;
 
 import com.liveklass.assignment.domain.course.Course;
 import com.liveklass.assignment.domain.course.CourseStatus;

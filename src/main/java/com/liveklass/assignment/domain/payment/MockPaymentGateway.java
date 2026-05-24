@@ -24,6 +24,12 @@ public class MockPaymentGateway implements PaymentGateway {
 
     @Override
     public void cancel(String externalPaymentKey) {
+        try {
+            Thread.sleep(PROCESSING_DELAY_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new PaymentGatewayException("결제 취소 중 인터럽트가 발생했습니다.");
+        }
         log.info("Mock payment gateway cancel invoked. externalPaymentKey={}", externalPaymentKey);
     }
 }
