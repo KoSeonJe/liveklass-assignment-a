@@ -43,6 +43,3 @@ bin/
 .env
 *.log
 /data/
-
-# Docs (작업 참고용, 커밋 제외)
-/docs/
