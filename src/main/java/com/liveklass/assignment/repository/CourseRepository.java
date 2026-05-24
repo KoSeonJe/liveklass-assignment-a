@@ -1,6 +1,8 @@
 package com.liveklass.assignment.repository;
 
 import com.liveklass.assignment.domain.course.Course;
+import com.liveklass.assignment.domain.course.CourseStatus;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 public interface CourseRepository extends JpaRepository<Course, Long> {
 
     Page<Course> findAllByOrderByIdDesc(Pageable pageable);
+
+    List<Course> findAllByStatus(CourseStatus status);
 
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)

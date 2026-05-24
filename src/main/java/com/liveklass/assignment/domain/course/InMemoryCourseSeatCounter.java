@@ -13,6 +13,14 @@ public class InMemoryCourseSeatCounter {
         counters.put(courseId, new AtomicInteger(remaining));
     }
 
+    public void add(Long courseId, int remaining) {
+        counters.put(courseId, new AtomicInteger(remaining));
+    }
+
+    public boolean contains(Long courseId) {
+        return counters.containsKey(courseId);
+    }
+
     public boolean tryAcquire(Long courseId) {
         AtomicInteger counter = counters.get(courseId);
         if (counter == null) {
