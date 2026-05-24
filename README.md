@@ -434,23 +434,6 @@ course (1) ──< enrollment (1) ──< payment
 | `created_at` | DATETIME | NOT NULL | `@CreatedDate` |
 | `updated_at` | DATETIME | NOT NULL | `@LastModifiedDate` |
 
-**인덱스**
-
-| 이름 | 컬럼 | 용도 |
-|---|---|---|
-| `idx_course_status` | `status` | 강의 목록(상태별 필터·정렬)에서 status 카디널리티 활용 |
-| `idx_course_creator` | `creator_id` | 크리에이터 권한 검증 / 향후 크리에이터별 조회 확장 여지 |
-
-**`current_count` 무결성 방어선**
-
-| 계층 | 방어 수단 |
-|---|---|
-| 도메인 | `validateRemainingCapacity()` — 정원 미달일 때만 신청 허용 |
-| 인메모리 | `AtomicInteger` CAS — 동시 차감 충돌 직렬화 |
-| Repository | `UPDATE ... WHERE status='OPEN' AND current_count < max_capacity` — 원자적 갱신 + 0건 영향 행 시 실패 보상 |
-
-> DB CHECK 제약은 미부착. Hibernate `ddl-auto` 자동 스키마 생성을 사용 중이며, 위 3계층 방어로 `current_count > max_capacity` 진입 경로가 없음을 동시성 테스트(`EnrollmentConcurrencyMatrixE2ETest`)로 확인.
-
 ### 8-3. `enrollment` 테이블
 
 | 컬럼 | 타입 | NULL | 설명 |
@@ -460,23 +443,8 @@ course (1) ──< enrollment (1) ──< payment
 | `classmate_id` | BIGINT | NOT NULL | 신청자. 본인 검증 키 |
 | `status` | VARCHAR(20) | NOT NULL | `PENDING` / `CONFIRMED` / `CANCELLED` |
 | `created_at` | DATETIME | NOT NULL | 신청 시각 |
-| `confirmed_at` | DATETIME | NULL | CONFIRMED 전이 시 set, `rollbackToPending`에서 null로 복귀 |
-| `cancelled_at` | DATETIME | NULL | CANCELLED 전이 시 set, `revertCancel`에서 null로 복귀 |
-
-**인덱스**
-
-| 이름 | 컬럼 | 용도 |
-|---|---|---|
-| `idx_enrollment_course_status` | `(course_id, status)` | 강의별 수강생 목록(`GET /api/courses/{id}/enrollments`)의 핵심 쿼리. status 필터 + course_id 등호 조합 |
-| `idx_enrollment_classmate` | `classmate_id` | 본인 수강 신청 목록(`GET /api/me/enrollments`) |
-
-**타임스탬프 정책**
-
-- `created_at`: PENDING 생성 시각. immutable.
-- `confirmed_at`: 취소 기간 7일 계산의 기준 시각 ([§4 "명세 공백에 대한 결정"](#명세-공백에-대한-결정) 항목 2). CONFIRMED 진입 시 set, 결제 실패 보상으로 PENDING 롤백 시 null.
-- `cancelled_at`: 감사·통계 용. 환불 실패 보상(`revertCancel`)으로 CONFIRMED 복귀 시 null.
-
-`updated_at`은 두지 않음 — 상태별 시각 컬럼이 변경 이력을 대체.
+| `confirmed_at` | DATETIME | NULL | CONFIRMED 전이 시 set, 결제 실패 보상 롤백 시 null |
+| `cancelled_at` | DATETIME | NULL | CANCELLED 전이 시 set, 환불 실패 보상 복귀 시 null |
 
 ### 8-4. `payment` 테이블
 
@@ -490,14 +458,6 @@ course (1) ──< enrollment (1) ──< payment
 | `status` | VARCHAR(20) | NOT NULL | `PENDING` / `SUCCESS` / `FAILED` / `CANCELLED` |
 | `created_at` | DATETIME | NOT NULL | 결제 시도 시각 |
 | `updated_at` | DATETIME | NOT NULL | |
-
-**UNIQUE 제약**
-
-| 이름 | 컬럼 | 용도 |
-|---|---|---|
-| `uk_payment_idempotency_key` | `idempotency_key` | 동일 멱등키 중복 INSERT를 DB 단에서 차단. 동일 키 재호출 시 기존 Payment 결과 반환 |
-
-> Payment row는 결제 시도 시점 생성. 결제 전 PENDING이 없으므로 `PaymentStatus` 상태 머신은 `(없음) → PENDING`만 가지며, `PENDING → CANCELLED` 직접 전이는 정의하지 않음 ([§5-2](#5-2-상태-머신)).
 
 ### 8-5. 명시적으로 두지 않은 것
 
